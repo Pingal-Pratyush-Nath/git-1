@@ -1,0 +1,114 @@
+NN = 10;
+
+X = PauliMatrix[1];
+Y = PauliMatrix[2];
+Z = PauliMatrix[3];
+Id = IdentityMatrix[2];
+
+Clear[an, on, bn];
+iprod[a_, b_] := Tr[ConjugateTranspose[a].b]/2^6;
+comm[a_, b_] := a.b - b.a;
+
+ls = {};
+Do[AppendTo[ls, {i, j}], {j, 1, NN}, {i, 1, j - 1}]
+
+
+
+term1 = {};
+Do[t = {};
+ Do[AppendTo[t, Id], {k, 1, NN}];
+ Do[If[ls[[i]][[1]] == j, t[[j]] = Z], {j, 1, NN}];
+ Do[If[ls[[i]][[2]] == j, t[[j]] = Z], {j, 1, NN}];
+ c = t[[1]];
+ Do[c = KroneckerProduct[c, t[[i]]], {i, 2, NN}];
+ AppendTo[term1, g/Sqrt[NN]* SparseArray[ c]],
+ {i, 1, Length[ls]}]
+
+NL = Total[term1];
+
+term2 = {};
+Do[t = {};
+ Do[AppendTo[t, Id], {k, 1, NN}];
+ t[[i]] = X;
+ 
+ c = t[[1]];
+ Do[c = KroneckerProduct[c, t[[i]]], {i, 2, NN}];
+ AppendTo[term2, -hx*SparseArray[ c]],
+ {i, 1, NN}]
+
+XT = Total[term2];
+
+term3 = {};
+Do[t = {};
+ Do[AppendTo[t, Id], {k, 1, NN}];
+ t[[i]] = Z;
+ 
+ c = t[[1]];
+ Do[c = KroneckerProduct[c, t[[i]]], {i, 2, NN}];
+ AppendTo[term3, -hz*SparseArray[ c]],
+ {i, 1, NN}]
+
+ZT = Total[term3];
+
+
+term4 = {};
+Do[t = {};
+ Do[AppendTo[t, Id], {k, 1, NN}];
+ t[[i]] = Z;
+ t[[i + 1]] = Z;
+ c = t[[1]];
+ Do[c = KroneckerProduct[c, t[[i]]], {i, 2, NN}];
+ AppendTo[term4, -J*SparseArray[ c]],
+ {i, 1, NN - 1}]
+
+ZZ = Total[term4];
+
+
+
+
+HamNL[g_, J_, hx_, hz_] =  ZZ + XT + ZT - NL;
+HamL[J_, hx_, hz_] = ZZ + ZT + XT;
+ls = {};
+Do[AppendTo[ls, Id], {i, 1, NN}];
+ls[[NN/2]] = X;
+c = ls[[1]];
+Do[c = KroneckerProduct[c, ls[[i]]], {i, 2, NN}];
+oper = SparseArray[c];
+o = oper/Sqrt[iprod[oper, oper]];
+
+
+KRYLOV[n0_, H0_] := Module[{n = n0, H = H0}, 
+  krylov = {};
+  
+  an = {};
+  on = {};
+  bn = {};
+  foan = {};
+  
+  AppendTo[an, o // N];
+  AppendTo[on, o // N];
+  AppendTo[bn, 0];
+  
+  AppendTo[an, comm[H, an[[1]]] // N];
+  AppendTo[bn , Simplify[Sqrt[iprod[an[[2]], an[[2]]]]] // N];
+  AppendTo[on, 1/bn[[2]] an[[2]] // N];
+  Print[bn];
+  
+  Monitor[For[i = 3, i <= n, i++,
+    AppendTo[an, comm[H, on[[i - 1]]]];
+    
+    AppendTo[foan, 
+     an[[i]] - Sum[on[[j]]*iprod[on[[j]], an[[i]]], {j, 1, i - 1}] // 
+      N];
+    
+    
+    AppendTo[bn, Sqrt[iprod[foan[[i - 2]], foan[[i - 2]]]] // N];
+    
+    
+    AppendTo[on, 1/bn[[i]] foan[[i - 2]] // N];
+    
+    
+    
+    ], i];
+  bn]
+
